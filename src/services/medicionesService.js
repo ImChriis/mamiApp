@@ -1,11 +1,13 @@
 import { supabase } from './supabase';
 
+const TABLA = 'mediciones';
+
 export const medicionesService = {
-    async getHistorial() {
+    async obtenerMediciones() {
     const { data, error } = await supabase
       .from(TABLA)
-      .select('*')
-      .order('created_at', { ascending: false });
+      .select('*');
+      // .order('created_at', { ascending: false });
 
     if (error) throw new Error(error.message);
     return data;
