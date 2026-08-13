@@ -4,7 +4,7 @@ import { View, Text, TouchableOpacity, StyleSheet } from 'react-native';
 import { useNavigation, useRoute } from '@react-navigation/native';
 import { Ionicons } from '@expo/vector-icons';
 
-export default function Navbar() {
+export default function Navbar({ currentRoute }) {
   const navigation = useNavigation();
   const route = useRoute();
 
@@ -48,7 +48,19 @@ const styles = StyleSheet.create({
     justifyContent: 'space-around',
     alignItems: 'center',
     elevation: 8,
+    position: 'absolute',
+    bottom: 0,
+    width: '100%',
+    height: 80,
   },
-  tabButton: { alignItems: 'center', justifyContent: 'center', flex: 1 },
-  label: { fontSize: 12, fontWeight: '600', marginTop: 4 },
+  tabButton: { 
+    alignItems: 'center', 
+    justifyContent: 'center', 
+    flex: 1 
+  },
+  label: { 
+    fontSize: 12, 
+    fontWeight: '600', 
+    marginTop: 4 
+  },
 });
