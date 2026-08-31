@@ -184,7 +184,7 @@ export default function HistorialScreen() {
                     return `
                       <tr>
                         <td class="${turno === 'Diurno' ? 'diurno-tag' : 'nocturno-tag'}">${turno}</td>
-                        <td colspan="7" class="pending">Sin registro cargado</td>
+                        <td colspan="6" class="pending">Sin registro cargado</td>
                       </tr>
                     `;
                   }
@@ -194,7 +194,6 @@ export default function HistorialScreen() {
                       <td>${datos.brazo_izquierdo_tension || '--'} / ${datos.brazo_izquierdo_pulso ? datos.brazo_izquierdo_pulso + ' BPM' : '--'}</td>
                       <td>${datos.brazo_derecho_tension || '--'} / ${datos.brazo_derecho_pulso ? datos.brazo_derecho_pulso + ' BPM' : '--'}</td>
                       <td>${datos.glicemia ? datos.glicemia + ' mg/dL' : '--'}</td>
-                      <td>${datos.peso ? datos.peso + ' kg' : '--'}</td>
                       <td>${datos.oximetro_oxigeno ? datos.oximetro_oxigeno + '%' : '--'}</td>
                       <td>${datos.oximetro_pulso ? datos.oximetro_pulso + ' BPM' : '--'}</td>
                       <td>${datos.edema || 'No'}</td>
@@ -212,7 +211,6 @@ export default function HistorialScreen() {
                           <th>Brazo Izq. (T/P)</th>
                           <th>Brazo Der. (T/P)</th>
                           <th>Glicemia</th>
-                          <th>Peso</th>
                           <th>Oxigeno</th>
                           <th>Pulso Ox.</th>
                           <th>Edema</th>
@@ -322,10 +320,6 @@ export default function HistorialScreen() {
           <Text style={styles.secondaryItem}>
             <Text style={styles.boldText}>Glicemia: </Text>
             {datos.glicemia ? `${datos.glicemia} mg/dL` : '--'}
-          </Text>
-          <Text style={styles.secondaryItem}>
-            <Text style={styles.boldText}>Peso: </Text>
-            {datos.peso ? `${datos.peso} kg` : '--'}
           </Text>
           <Text style={styles.secondaryItem}>
             <Text style={styles.boldText}>SpO2: </Text>
@@ -584,7 +578,7 @@ const styles = StyleSheet.create({
   },
   secondaryRow: {
     flexDirection: 'row',
-    justifyContent: 'space-between',
+    justifyContent: 'space-around',
     borderTopWidth: 1,
     borderTopColor: '#f1f5f9',
     paddingTop: 8,
