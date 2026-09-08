@@ -8,11 +8,14 @@ import {
   RefreshControl,
   TouchableOpacity,
   Alert,
+  Modal,
+  Platform,
 } from 'react-native';
 import { SafeAreaProvider, SafeAreaView } from 'react-native-safe-area-context';
 import { StatusBar } from 'expo-status-bar';
 import { useFocusEffect } from '@react-navigation/native';
 import { Ionicons } from '@expo/vector-icons';
+import DateTimePicker from '@react-native-community/datetimepicker';
 import * as Print from 'expo-print';
 import * as Sharing from 'expo-sharing';
 import { medicionesService } from '../services/medicionesService';
@@ -23,6 +26,13 @@ export default function HistorialScreen() {
   const [refreshing, setRefreshing] = useState(false);
   const [downloadingPdf, setDownloadingPdf] = useState(false);
   const [diasAgrupados, setDiasAgrupados] = useState([]);
+
+  // Estados para el Modal de Filtro de PDF
+  const [modalVisible, setModalVisible] = useState(false);
+  const [fechaDesde, setFechaDesde] = useState(new Date());
+  const [fechaHasta, setFechaHasta] = useState(new Date());
+  const [showPickerDesde, setShowPickerDesde] = useState(false);
+  const [showPickerHasta, setShowPickerHasta] = useState(false);
 
   // Cargar datos cada vez que la pantalla enfoca
   const fetchHistorial = async () => {
@@ -85,17 +95,62 @@ export default function HistorialScreen() {
     });
   };
 
-  // Generador de reporte PDF
-  const handleExportPDF = async () => {
+  const formatearFechaDisplay = (date) => {
+    return date.toLocaleDateString('es-ES', {
+      day: '2-digit',
+      month: '2-digit',
+      year: 'numeric',
+    });
+  };
+
+  // Abrir Modal de PDF
+  const handleOpenPdfModal = () => {
     if (diasAgrupados.length === 0) {
       Alert.alert('Aviso', 'No hay registros para exportar en PDF.');
       return;
     }
 
+    // Inicializar fechas por defecto (por ejemplo: hace 30 días hasta hoy)
+    const hoy = new Date();
+    const hace30Dias = new Date();
+    hace30Dias.setDate(hoy.getDate() - 30);
+
+    setFechaDesde(hace30Dias);
+    setFechaHasta(hoy);
+    setModalVisible(true);
+  };
+
+  // Generador de reporte PDF con rango filtrado
+  const handleExportPDF = async () => {
+    // Ajustar 'desde' al inicio del día y 'hasta' al final del día
+    const inicio = new Date(fechaDesde);
+    inicio.setHours(0, 0, 0, 0);
+
+    const fin = new Date(fechaHasta);
+    fin.setHours(23, 59, 59, 999);
+
+    if (inicio > fin) {
+      Alert.alert('Error', 'La fecha "Desde" no puede ser posterior a "Hasta".');
+      return;
+    }
+
+    // Filtrar los días dentro del rango
+    const diasFiltrados = diasAgrupados.filter((item) => {
+      const [year, month, day] = item.fecha.split('-');
+      const fechaItem = new Date(year, month - 1, day);
+      return fechaItem >= inicio && fechaItem <= fin;
+    });
+
+    if (diasFiltrados.length === 0) {
+      Alert.alert('Aviso', 'No hay registros en el rango de fechas seleccionado.');
+      return;
+    }
+
+    setModalVisible(false);
+
     try {
       setDownloadingPdf(true);
 
-      // Generar las filas de las tablas agrupadas por día
       const htmlContent = `
         <!DOCTYPE html>
         <html>
@@ -174,10 +229,11 @@ export default function HistorialScreen() {
           <body>
             <div class="header">
               <h1 class="title">Historial de Mediciones Médicas</h1>
-              <p class="subtitle">Documento generado el ${new Date().toLocaleDateString('es-ES')} a las ${new Date().toLocaleTimeString('es-ES', { hour: '2-digit', minute: '2-digit' })}</p>
+              <p class="subtitle">Período: ${formatearFechaDisplay(fechaDesde)} al ${formatearFechaDisplay(fechaHasta)}</p>
+              <p class="subtitle">Generado el ${new Date().toLocaleDateString('es-ES')} a las ${new Date().toLocaleTimeString('es-ES', { hour: '2-digit', minute: '2-digit' })}</p>
             </div>
 
-            ${diasAgrupados
+            ${diasFiltrados
               .map((dia) => {
                 const renderRow = (turno, datos) => {
                   if (!datos) {
@@ -211,7 +267,7 @@ export default function HistorialScreen() {
                           <th>Brazo Izq. (T/P)</th>
                           <th>Brazo Der. (T/P)</th>
                           <th>Glicemia</th>
-                          <th>Oxigeno</th>
+                          <th>Oxígeno</th>
                           <th>Pulso Ox.</th>
                           <th>Edema</th>
                         </tr>
@@ -233,13 +289,11 @@ export default function HistorialScreen() {
         </html>
       `;
 
-      // Crear archivo PDF temporal
       const { uri } = await Print.printToFileAsync({
         html: htmlContent,
         base64: false,
       });
 
-      // Abrir menú para compartir/guardar el archivo
       if (await Sharing.isAvailableAsync()) {
         await Sharing.shareAsync(uri, {
           UTI: '.pdf',
@@ -343,7 +397,7 @@ export default function HistorialScreen() {
 
           <TouchableOpacity
             style={styles.downloadButton}
-            onPress={handleExportPDF}
+            onPress={handleOpenPdfModal}
             disabled={downloadingPdf}
             activeOpacity={0.7}
           >
@@ -391,6 +445,96 @@ export default function HistorialScreen() {
             )}
           />
         )}
+
+        {/* Modal de Exportación PDF con Selección de Rango */}
+        <Modal
+          animationType="fade"
+          transparent={true}
+          visible={modalVisible}
+          onRequestClose={() => setModalVisible(false)}
+        >
+          <View style={styles.modalOverlay}>
+            <View style={styles.modalContent}>
+              <View style={styles.modalHeader}>
+                <Ionicons name="document-text-outline" size={24} color="#2563eb" />
+                <Text style={styles.modalTitle}>Exportar PDF</Text>
+              </View>
+              <Text style={styles.modalSubtitle}>
+                Selecciona el rango de fechas para generar el reporte.
+              </Text>
+
+              {/* Fecha Desde */}
+              <View style={styles.inputGroup}>
+                <Text style={styles.inputLabel}>Desde:</Text>
+                <TouchableOpacity
+                  style={styles.dateSelector}
+                  onPress={() => setShowPickerDesde(true)}
+                >
+                  <Ionicons name="calendar-outline" size={18} color="#64748b" />
+                  <Text style={styles.dateText}>
+                    {formatearFechaDisplay(fechaDesde)}
+                  </Text>
+                </TouchableOpacity>
+              </View>
+
+              {showPickerDesde && (
+                <DateTimePicker
+                  value={fechaDesde}
+                  mode="date"
+                  display={Platform.OS === 'ios' ? 'inline' : 'default'}
+                  onChange={(event, date) => {
+                    setShowPickerDesde(Platform.OS === 'ios');
+                    if (date) setFechaDesde(date);
+                  }}
+                />
+              )}
+
+              {/* Fecha Hasta */}
+              <View style={styles.inputGroup}>
+                <Text style={styles.inputLabel}>Hasta:</Text>
+                <TouchableOpacity
+                  style={styles.dateSelector}
+                  onPress={() => setShowPickerHasta(true)}
+                >
+                  <Ionicons name="calendar-outline" size={18} color="#64748b" />
+                  <Text style={styles.dateText}>
+                    {formatearFechaDisplay(fechaHasta)}
+                  </Text>
+                </TouchableOpacity>
+              </View>
+
+              {showPickerHasta && (
+                <DateTimePicker
+                  value={fechaHasta}
+                  mode="date"
+                  display={Platform.OS === 'ios' ? 'inline' : 'default'}
+                  onChange={(event, date) => {
+                    setShowPickerHasta(Platform.OS === 'ios');
+                    if (date) setFechaHasta(date);
+                  }}
+                />
+              )}
+
+              {/* Botones de Acción */}
+              <View style={styles.modalActions}>
+                <TouchableOpacity
+                  style={[styles.modalButton, styles.cancelButton]}
+                  onPress={() => setModalVisible(false)}
+                >
+                  <Text style={styles.cancelButtonText}>Cancelar</Text>
+                </TouchableOpacity>
+
+                <TouchableOpacity
+                  style={[styles.modalButton, styles.confirmButton]}
+                  onPress={handleExportPDF}
+                >
+                  <Ionicons name="download-outline" size={18} color="#ffffff" />
+                  <Text style={styles.confirmButtonText}>Generar</Text>
+                </TouchableOpacity>
+              </View>
+            </View>
+          </View>
+        </Modal>
 
         <Navbar currentRoute="Historial" />
       </SafeAreaView>
@@ -600,5 +744,95 @@ const styles = StyleSheet.create({
     marginTop: 12,
     fontSize: 15,
     color: '#64748b',
+  },
+  // Estilos del Modal
+  modalOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(15, 23, 42, 0.5)',
+    justifyContent: 'center',
+    alignItems: 'center',
+    paddingHorizontal: 20,
+  },
+  modalContent: {
+    width: '100%',
+    backgroundColor: '#ffffff',
+    borderRadius: 16,
+    padding: 20,
+    elevation: 5,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 8,
+  },
+  modalHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    marginBottom: 4,
+  },
+  modalTitle: {
+    fontSize: 18,
+    fontWeight: 'bold',
+    color: '#0f172a',
+  },
+  modalSubtitle: {
+    fontSize: 13,
+    color: '#64748b',
+    marginBottom: 20,
+  },
+  inputGroup: {
+    marginBottom: 14,
+  },
+  inputLabel: {
+    fontSize: 13,
+    fontWeight: '600',
+    color: '#334155',
+    marginBottom: 6,
+  },
+  dateSelector: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10,
+    backgroundColor: '#f8fafc',
+    borderWidth: 1,
+    borderColor: '#cbd5e1',
+    borderRadius: 8,
+    paddingHorizontal: 12,
+    paddingVertical: 10,
+  },
+  dateText: {
+    fontSize: 14,
+    color: '#0f172a',
+    fontWeight: '500',
+  },
+  modalActions: {
+    flexDirection: 'row',
+    justifyContent: 'flex-end',
+    gap: 10,
+    marginTop: 20,
+  },
+  modalButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    paddingHorizontal: 16,
+    paddingVertical: 10,
+    borderRadius: 8,
+  },
+  cancelButton: {
+    backgroundColor: '#f1f5f9',
+  },
+  cancelButtonText: {
+    fontSize: 14,
+    fontWeight: '600',
+    color: '#64748b',
+  },
+  confirmButton: {
+    backgroundColor: '#2563eb',
+  },
+  confirmButtonText: {
+    fontSize: 14,
+    fontWeight: '600',
+    color: '#ffffff',
   },
 });
